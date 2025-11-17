@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自定义敏感信息规则 - DLP系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .rule-card {
+            border-left: 4px solid #007bff;
+            transition: all 0.3s ease;
+        }
+        .rule-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .rule-card.disabled {
+            border-left-color: #6c757d;
+            opacity: 0.6;
+        }
+        .code-block {
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        .example-tab {
+            cursor: pointer;
+        }
+        .example-tab.active {
+            background-color: #007bff;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-shield-check"></i> DLP系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('upload_file') }}">
+                            <i class="bi bi-upload"></i> 文件扫描
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('text_scan') }}">
+                            <i class="bi bi-textarea-t"></i> 文本扫描
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('data_masking') }}">
+                            <i class="bi bi-eye-slash"></i> 数据脱敏
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('scan_history') }}">
+                            <i class="bi bi-clock-history"></i> 扫描历史
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('system_config') }}">
+                            <i class="bi bi-gear"></i> 系统配置
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('custom_rules') }}">
+                            <i class="bi bi-code-slash"></i> 自定义规则
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('manual_import') }}">
+                            <i class="bi bi-journal-arrow-up"></i> 手动导入
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-info alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-code-slash"></i> 自定义敏感信息规则</h2>
+        </div>
+
+        <!-- 选项卡 -->
+        <ul class="nav nav-tabs" id="rulesTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="rules-tab" data-bs-toggle="tab" data-bs-target="#rules-panel" type="button" role="tab">
+                    <i class="bi bi-list"></i> 规则列表
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="import-tab" data-bs-toggle="tab" data-bs-target="#import-panel" type="button" role="tab">
+                    <i class="bi bi-upload"></i> 规则导入
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="examples-tab" data-bs-toggle="tab" data-bs-target="#examples-panel" type="button" role="tab">
+                    <i class="bi bi-book"></i> 示例格式
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content mt-3" id="rulesTabsContent">
+            <!-- 规则列表 -->
+            <div class="tab-pane fade show active" id="rules-panel" role="tabpanel">
+                {% if rules %}
+                <div class="row">
+                    {% for rule in rules %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card rule-card {{ 'disabled' if not rule.enabled else '' }}">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title">{{ rule.name }}</h6>
+                                    <div>
+                                        <span class="badge bg-{{ 'danger' if rule.sensitivity_level.value == '极高' else 'warning' if rule.sensitivity_level.value == '高' else 'info' if rule.sensitivity_level.value == '中' else 'success' }}">
+                                            {{ rule.sensitivity_level.value }}
+                                        </span>
+                                        {% if rule.enabled %}
+                                        <span class="badge bg-success">启用</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">禁用</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <p class="card-text text-muted">{{ rule.description or '无描述' }}</p>
+                                
+                                <div class="mb-2">
+                                    <small class="text-muted">正则表达式:</small><br>
+                                    <code class="small">{{ rule.pattern }}</code>
+                                </div>
+                                
+                                <div class="row mb-2">
+                                    <div class="col-6">
+                                        <small class="text-muted">处置建议:</small><br>
+                                        <strong>{{ rule.action_type.value }}</strong>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">阈值:</small><br>
+                                        <strong>{{ rule.threshold }}</strong>
+                                    </div>
+                                </div>
+                                
+                                {% if rule.masking_pattern %}
+                                <div class="mb-2">
+                                    <small class="text-muted">脱敏模式:</small><br>
+                                    <code class="small">{{ rule.masking_pattern }}</code>
+                                </div>
+                                {% endif %}
+                                
+                                <div class="d-flex justify-content-between">
+                                    <small class="text-muted">
+                                        <i class="bi bi-calendar"></i> {{ rule.created_time.strftime('%Y-%m-%d %H:%M') }}
+                                    </small>
+                                    <div>
+                                        <form method="post" action="{{ url_for('toggle_custom_rule', rule_id=rule.id) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-{{ 'success' if not rule.enabled else 'warning' }}">
+                                                <i class="bi bi-{{ 'play' if not rule.enabled else 'pause' }}"></i>
+                                                {{ '启用' if not rule.enabled else '禁用' }}
+                                            </button>
+                                        </form>
+                                        <form method="post" action="{{ url_for('delete_custom_rule', rule_id=rule.id) }}" class="d-inline" onsubmit="return confirm('确定要删除这个规则吗？')">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-trash"></i> 删除
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-code-slash" style="font-size: 4rem; color: #6c757d;"></i>
+                    <h4 class="mt-3 text-muted">暂无自定义规则</h4>
+                    <p class="text-muted">使用规则导入功能添加自定义规则以扩展敏感信息识别能力</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- 规则导入 -->
+            <div class="tab-pane fade" id="import-panel" role="tabpanel">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-upload"></i> 导入规则
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post">
+                            <input type="hidden" name="action" value="import_rules">
+                            
+                            <div class="mb-3">
+                                <label class="form-label">选择格式</label>
+                                <select class="form-select" name="format_type" id="formatType">
+                                    <option value="json">JSON格式</option>
+                                    <option value="yaml">YAML格式</option>
+                                    <option value="txt">文本格式</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">规则内容</label>
+                                <textarea class="form-control" name="rules_content" rows="15" 
+                                          placeholder="请粘贴规则内容..."></textarea>
+                                <div class="form-text">支持JSON、YAML、文本三种格式</div>
+                            </div>
+                            
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-upload"></i> 导入规则
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="loadExample()">
+                                    <i class="bi bi-file-text"></i> 加载示例
+                                </button>
+                                <button type="button" class="btn btn-outline-info" onclick="validateRules()">
+                                    <i class="bi bi-check"></i> 验证规则
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 示例格式 -->
+            <div class="tab-pane fade" id="examples-panel" role="tabpanel">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-book"></i> 示例格式
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="nav nav-pills mb-3" id="exampleTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link example-tab active" id="json-example-tab" data-bs-toggle="tab" data-bs-target="#json-example" type="button">
+                                    JSON格式
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link example-tab" id="yaml-example-tab" data-bs-toggle="tab" data-bs-target="#yaml-example" type="button">
+                                    YAML格式
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link example-tab" id="txt-example-tab" data-bs-toggle="tab" data-bs-target="#txt-example" type="button">
+                                    文本格式
+                                </button>
+                            </li>
+                        </ul>
+                        
+                        <div class="tab-content" id="exampleTabsContent">
+                            <div class="tab-pane fade show active" id="json-example">
+                                <h6>JSON格式示例:</h6>
+                                <div class="code-block">
+                                    <pre id="json-example-content">{{ example_rules.json|e }}</pre>
+                                </div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="copyExample('json')">
+                                    <i class="bi bi-clipboard"></i> 复制示例
+                                </button>
+                            </div>
+                            
+                            <div class="tab-pane fade" id="yaml-example">
+                                <h6>YAML格式示例:</h6>
+                                <div class="code-block">
+                                    <pre id="yaml-example-content">{{ example_rules.yaml|e }}</pre>
+                                </div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="copyExample('yaml')">
+                                    <i class="bi bi-clipboard"></i> 复制示例
+                                </button>
+                            </div>
+                            
+                            <div class="tab-pane fade" id="txt-example">
+                                <h6>文本格式示例:</h6>
+                                <div class="code-block">
+                                    <pre id="txt-example-content">{{ example_rules.txt|e }}</pre>
+                                </div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="copyExample('txt')">
+                                    <i class="bi bi-clipboard"></i> 复制示例
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <h6>规则字段说明:</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>字段名</th>
+                                            <th>类型</th>
+                                            <th>必需</th>
+                                            <th>说明</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>name</td>
+                                            <td>string</td>
+                                            <td>是</td>
+                                            <td>规则名称</td>
+                                        </tr>
+                                        <tr>
+                                            <td>description</td>
+                                            <td>string</td>
+                                            <td>否</td>
+                                            <td>规则描述</td>
+                                        </tr>
+                                        <tr>
+                                            <td>pattern</td>
+                                            <td>string</td>
+                                            <td>是</td>
+                                            <td>正则表达式模式</td>
+                                        </tr>
+                                        <tr>
+                                            <td>sensitivity_level</td>
+                                            <td>string</td>
+                                            <td>是</td>
+                                            <td>敏感级别 (low/medium/high/critical)</td>
+                                        </tr>
+                                        <tr>
+                                            <td>action_type</td>
+                                            <td>string</td>
+                                            <td>是</td>
+                                            <td>处置建议 (log_only/mask_data/block_access/delete_data/notify_admin)</td>
+                                        </tr>
+                                        <tr>
+                                            <td>threshold</td>
+                                            <td>float</td>
+                                            <td>否</td>
+                                            <td>识别阈值 (0.0-1.0，默认0.8)</td>
+                                        </tr>
+                                        <tr>
+                                            <td>masking_pattern</td>
+                                            <td>string</td>
+                                            <td>否</td>
+                                            <td>脱敏模式，使用{content}占位符；{content[:4]} - 前4位；{content[-4:]} - 后4位</td>
+                                        </tr>
+                                        <tr>
+                                            <td>test_samples</td>
+                                            <td>array</td>
+                                            <td>否</td>
+                                            <td>测试样本</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 数据集测试（新增） -->
+            <div class="tab-pane fade" id="dataset-panel" role="tabpanel">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-table"></i> 数据集测试（CSV）</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="datasetForm" enctype="multipart/form-data" onsubmit="return false;">
+                            <div class="mb-3">
+                                <label class="form-label">上传CSV（列: rule_name,text,expected_match）</label>
+                                <input type="file" class="form-control" id="datasetFile" accept=".csv">
+                                <div class="form-text">expected_match: true/false</div>
+                            </div>
+                            <button class="btn btn-primary" onclick="submitDataset()">
+                                <i class="bi bi-upload"></i> 开始测试
+                            </button>
+                        </form>
+                        <div id="datasetResult" class="mt-3" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 从页面元素获取示例内容（避免HTML编码问题）
+        function getExampleContent(format) {
+            const elementId = format + '-example-content';
+            const element = document.getElementById(elementId);
+            if (element) {
+                return element.textContent || element.innerText;
+            }
+            return '';
+        }
+        
+        function loadExample() {
+            const formatType = document.getElementById('formatType').value;
+            const textarea = document.querySelector('textarea[name="rules_content"]');
+            
+            const exampleContent = getExampleContent(formatType);
+            textarea.value = exampleContent;
+        }
+        
+        function copyExample(format) {
+            const exampleContent = getExampleContent(format);
+            
+            navigator.clipboard.writeText(exampleContent).then(function() {
+                alert('示例已复制到剪贴板');
+            }).catch(function(err) {
+                console.error('复制失败:', err);
+                alert('复制失败，请手动复制');
+            });
+        }
+        
+        function validateRules() {
+            const content = document.querySelector('textarea[name="rules_content"]').value;
+            const formatType = document.getElementById('formatType').value;
+            
+            if (!content.trim()) {
+                alert('请输入规则内容');
+                return;
+            }
+            
+            // 这里可以添加客户端验证逻辑
+            alert('规则格式验证通过');
+        }
+        
+        // 示例选项卡切换
+        document.querySelectorAll('.example-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.example-tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // 数据集测试
+        function submitDataset() {
+            const f = document.getElementById('datasetFile').files[0];
+            if (!f) { alert('请选择CSV文件'); return; }
+            const fd = new FormData();
+            fd.append('dataset', f);
+            fetch('/custom_rules/dataset_test', { method:'POST', body: fd })
+                .then(r => r.json())
+                .then(d => {
+                    const box = document.getElementById('datasetResult');
+                    if (d.success) {
+                        box.innerHTML = `<div class="alert alert-success">测试完成</div>
+                            <p><strong>总样本:</strong> ${d.total}</p>
+                            <p><strong>准确率:</strong> ${(d.accuracy*100).toFixed(2)}%</p>
+                            <p><strong>命中:</strong> ${d.correct} / <strong>错误:</strong> ${d.incorrect}</p>`;
+                    } else {
+                        box.innerHTML = `<div class="alert alert-danger">测试失败: ${d.error||'未知错误'}</div>`;
+                    }
+                    box.style.display = 'block';
+                })
+                .catch(() => alert('测试请求失败'));
+        }
+        // 为规则页增加“数据集测试”选项卡入口
+        (function addDatasetTab(){
+            const tabs = document.getElementById('rulesTabs');
+            const li = document.createElement('li');
+            li.className='nav-item';
+            li.innerHTML = `<button class="nav-link" id="dataset-tab" data-bs-toggle="tab" data-bs-target="#dataset-panel" type="button" role="tab"><i class="bi bi-table"></i> 数据集测试</button>`;
+            tabs.appendChild(li);
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DLP数据泄露防护系统</title>
+    <link href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+    <style>
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .card {
+            transition: transform 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .feature-icon {
+            font-size: 3rem;
+            color: #007bff;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-shield-check"></i> DLP系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('upload_file') }}">
+                            <i class="bi bi-upload"></i> 文件扫描
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('text_scan') }}">
+                            <i class="bi bi-textarea-t"></i> 文本扫描
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('data_masking') }}">
+                            <i class="bi bi-eye-slash"></i> 数据脱敏
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('scan_history') }}">
+                            <i class="bi bi-clock-history"></i> 扫描历史
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('system_config') }}">
+                            <i class="bi bi-gear"></i> 系统配置
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('custom_rules') }}">
+                            <i class="bi bi-code-slash"></i> 自定义规则
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('manual_import') }}">
+                            <i class="bi bi-journal-arrow-up"></i> 手动导入
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-info alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- 欢迎区域 -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="jumbotron bg-primary text-white p-5 rounded">
+                    <h1 class="display-4">DLP数据泄露防护系统</h1>
+                    <p class="lead">保护您的敏感数据，防止数据泄露风险</p>
+                    <hr class="my-4">
+                    <p>支持多种文件格式的敏感信息识别，提供数据脱敏和风险评估功能</p>
+                    <a class="btn btn-light btn-lg" href="{{ url_for('upload_file') }}" role="button">
+                        <i class="bi bi-upload"></i> 开始扫描
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 功能卡片 -->
+        <div class="row">
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-file-earmark-text feature-icon"></i>
+                        <h5 class="card-title">文件扫描</h5>
+                        <p class="card-text">支持PDF、DOCX、图片、JSON、CSV等多种格式的敏感信息识别</p>
+                        <a href="{{ url_for('upload_file') }}" class="btn btn-primary">
+                            <i class="bi bi-upload"></i> 上传文件
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-textarea-t feature-icon"></i>
+                        <h5 class="card-title">文本扫描</h5>
+                        <p class="card-text">直接输入文本内容进行敏感信息检测和风险评估</p>
+                        <a href="{{ url_for('text_scan') }}" class="btn btn-primary">
+                            <i class="bi bi-textarea-t"></i> 文本扫描
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-eye-slash feature-icon"></i>
+                        <h5 class="card-title">数据脱敏</h5>
+                        <p class="card-text">对敏感数据进行智能脱敏处理，保护隐私安全</p>
+                        <a href="{{ url_for('data_masking') }}" class="btn btn-primary">
+                            <i class="bi bi-eye-slash"></i> 数据脱敏
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-journal-arrow-up feature-icon"></i>
+                        <h5 class="card-title">手动导入</h5>
+                        <p class="card-text">跳过自动识别，人工上传并标注敏感文件</p>
+                        <a href="{{ url_for('manual_import') }}" class="btn btn-primary">
+                            <i class="bi bi-journal-arrow-up"></i> 手动导入
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 统计信息 -->
+        <div class="row mt-5">
+            <div class="col-12">
+                <h3 class="mb-4">系统统计</h3>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <h4 id="total-scans">-</h4>
+                        <p class="mb-0">总扫描次数</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <h4 id="completed-scans">-</h4>
+                        <p class="mb-0">成功扫描</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <h4 id="failed-scans">-</h4>
+                        <p class="mb-0">失败扫描</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <h4 id="high-risk-files">-</h4>
+                        <p class="mb-0">高风险文件</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 支持的敏感信息类型 -->
+        <div class="row mt-5">
+            <div class="col-12">
+                <h3 class="mb-4">支持的敏感信息类型</h3>
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <i class="bi bi-person-badge"></i> 身份证号(text)
+                                <span class="badge bg-danger rounded-pill">高</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <i class="bi bi-credit-card"></i> 银行卡号(text)
+                                <span class="badge bg-danger rounded-pill">高</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <i class="bi bi-telephone"></i> 手机号
+                                <span class="badge bg-danger rounded-pill">高</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <i class="bi bi-person"></i> 姓名
+                                <span class="badge bg-success rounded-pill">低</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <i class="bi bi-geo-alt"></i> 地址
+                                <span class="badge bg-success rounded-pill">低</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <i class="bi bi-envelope"></i> 邮箱
+                                <span class="badge bg-warning rounded-pill">中</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <i class="bi bi-person-badge"></i> 身份证图片
+                                <span class="badge bg-danger rounded-pill">高</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <i class="bi bi-credit-card"></i> 银行卡图片
+                                <span class="badge bg-danger rounded-pill">高</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <i class="bi bi-globe"></i> IP地址
+                                <span class="badge bg-success rounded-pill">低</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-2 mb-3">
+    <div class="col-md-12">
+        <strong>全局敏感类型统计：</strong>
+        {% for stype, count in stype_counts.items() %}
+        <span class="badge bg-danger me-1">{{ stype }}({{ count }})</span>
+        {% endfor %}
+        <span class="mx-3"></span>
+        <strong>全局风险分布：</strong>
+        {% for risk, count in risk_level_counts.items() %}
+        <span class="badge bg-{{ 'danger' if risk=='极高' else 'warning' if risk=='高' else 'info' if risk=='中' else 'secondary' if risk=='低' else 'success' if risk=='无' else 'secondary' }} me-1">
+            {{ risk }}{% if risk != '无' %}风险{% endif %}({{ count }})
+        </span>
+        {% endfor %}
+    </div>
+</div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark text-white text-center py-4 mt-5">
+        <div class="container">
+            <p class="mb-0">&copy; 2025 DLP数据泄露防护系统</p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script>
+        // 加载统计信息
+        fetch('/api/scan_stats')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('total-scans').textContent = data.total_scans;
+                document.getElementById('completed-scans').textContent = data.completed_scans;
+                document.getElementById('failed-scans').textContent = data.failed_scans;
+                const high = (data.risk_levels && (data.risk_levels['高'] || 0)) + (data.risk_levels && (data.risk_levels['极高'] || 0));
+                document.getElementById('high-risk-files').textContent = high || 0;
+            })
+            .catch(error => console.error('Error:', error));
+    </script>
+</body>
+</html>

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文本扫描结果 - DLP系统</title>
+    <link href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+    <style>
+        .text-result {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .sensitive-highlight {
+            background-color: #fff3cd;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: bold;
+            border: 1px solid #ffc107;
+        }
+        .risk-badge {
+            font-size: 0.9rem;
+        }
+        .confidence-bar {
+            height: 8px;
+            border-radius: 4px;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        .text-container {
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-shield-check"></i> DLP系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('upload_file') }}">
+                            <i class="bi bi-upload"></i> 文件扫描
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('text_scan') }}">
+                            <i class="bi bi-textarea-t"></i> 文本扫描
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('data_masking') }}">
+                            <i class="bi bi-eye-slash"></i> 数据脱敏
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('scan_history') }}">
+                            <i class="bi bi-clock-history"></i> 扫描历史
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('system_config') }}">
+                            <i class="bi bi-gear"></i> 系统配置
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('custom_rules') }}">
+                            <i class="bi bi-code-slash"></i> 自定义规则
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('manual_import') }}">
+                            <i class="bi bi-journal-arrow-up"></i> 手动导入
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="bi bi-textarea-t"></i> 文本扫描结果
+                        </h4>
+                        <div>
+                            <span class="badge bg-{{ 'danger' if risk_assessment.risk_level == '极高' else 'warning' if risk_assessment.risk_level == '高' else 'info' if risk_assessment.risk_level == '中' else 'secondary' if risk_assessment.risk_level == '低' else 'success' if risk_assessment.risk_level == '无' else 'secondary' }} risk-badge">
+                                {{ risk_assessment.risk_level }}{% if risk_assessment.risk_level != '无' %} 风险{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- 扫描统计 -->
+                        <div class="row mb-4">
+                            <div class="col-md-3">
+                                <div class="card bg-danger text-white">
+                                    <div class="card-body text-center">
+                                        <h5>{{ sensitive_items|length }}</h5>
+                                        <p class="mb-0">敏感信息</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-warning text-white">
+                                    <div class="card-body text-center">
+                                        <h5>{{ sensitive_items|selectattr('level.value', 'equalto', '高')|list|length }}</h5>
+                                        <p class="mb-0">高风险</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body text-center">
+                                        <h5>{{ sensitive_items|selectattr('level.value', 'equalto', '中')|list|length }}</h5>
+                                        <p class="mb-0">中风险</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-success text-white">
+                                    <div class="card-body text-center">
+                                        <h5>{{ sensitive_items|selectattr('level.value', 'equalto', '低')|list|length }}</h5>
+                                        <p class="mb-0">低风险</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 文本内容显示 -->
+                        <div class="text-result">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-file-text"></i> 扫描文本内容
+                                </h6>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('scannedText')">
+                                    <i class="bi bi-clipboard"></i> 复制文本
+                                </button>
+                            </div>
+                            <div class="text-container">
+                                <div id="scannedText" class="border p-3 bg-white rounded" style="min-height: 200px; white-space: pre-wrap; font-family: monospace;">{{ text_content }}</div>
+                            </div>
+                        </div>
+
+                        <!-- 风险评估 -->
+                        <div class="card mt-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-shield-exclamation"></i> 风险评估
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>风险等级: 
+                                            <span class="badge bg-{{ 'danger' if risk_assessment.risk_level == '极高' else 'warning' if risk_assessment.risk_level == '高' else 'info' if risk_assessment.risk_level == '中' else 'secondary' if risk_assessment.risk_level == '低' else 'success' if risk_assessment.risk_level == '无' else 'secondary' }}">
+                                                {{ risk_assessment.risk_level }}
+                                            </span>
+                                        </h6>
+                                        <p><strong>风险分数:</strong> {{ "%.2f"|format(risk_assessment.risk_score) }}</p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>处理建议:</h6>
+                                        <ul class="list-unstyled">
+                                            {% for recommendation in risk_assessment.recommendations %}
+                                            <li><i class="bi bi-check-circle text-success"></i> {{ recommendation }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 敏感信息详情 -->
+                        {% if sensitive_items %}
+                        <div class="card mt-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-exclamation-triangle"></i> 敏感信息详情
+                                </h5>
+                                <span class="badge bg-danger">{{ sensitive_items|length }} 个敏感信息</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>类型</th>
+                                                <th>内容</th>
+                                                <th>位置</th>
+                                                <th>风险等级</th>
+                                                <th>置信度</th>
+                                                <th>处置建议</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in sensitive_items %}
+                                            <tr>
+                                                <td>
+                                                    <i class="bi bi-{{ 'person-badge' if item.type == 'ID_CARD' or item.type == 'ID_CARD_IMAGE' else 'credit-card' if item.type == 'BANK_CARD' or item.type == 'BANK_CARD_IMAGE' else 'telephone' if item.type == 'MOBILE_PHONE' else 'person' if item.type == 'NAME' else 'geo-alt' if item.type == 'ADDRESS' else 'envelope' if item.type == 'EMAIL' else 'globe' }}"></i>
+                                                    {% if item.type == 'ID_CARD_IMAGE' %}身份证图片{% elif item.type == 'BANK_CARD_IMAGE' %}银行卡图片{% elif item.type == 'ID_CARD' %}身份证号{% elif item.type == 'BANK_CARD' %}银行卡号{% else %}{{ item.type }}{% endif %}
+                                                </td>
+                                                <td><code>{{ item.content }}</code></td>
+                                                <td>{{ item.position[0] }} - {{ item.position[1] }}</td>
+                                                <td>
+                                                    <span class="badge bg-{{ 'danger' if item.level.value == '极高' else 'warning' if item.level.value == '高' else 'info' if item.level.value == '中' else 'success' }}">
+                                                        {{ item.level.value }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div class="progress" style="height: 20px;">
+                                                        <div class="progress-bar bg-{{ 'danger' if item.confidence > 0.8 else 'warning' if item.confidence > 0.6 else 'info' }}" 
+                                                             style="width: {{ item.confidence * 100 }}%">
+                                                            {{ "%.1f"|format(item.confidence * 100) }}%
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    {% set action_value = item.action.value if item.action.value else item.action %}
+                                                    <span class="badge bg-secondary">{{ action_value }}</span>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="card mt-4">
+                            <div class="card-body text-center">
+                                <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+                                <h5 class="mt-3">未发现敏感信息</h5>
+                                <p class="text-muted">该文本未检测到敏感信息。可能包含未支持的敏感信息类型，建议人工审查。</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('data_masking') }}" class="btn btn-warning">
+                                <i class="bi bi-eye-slash"></i> 数据脱敏
+                            </a>
+                            <button class="btn btn-success" onclick="downloadResult()">
+                                <i class="bi bi-download"></i> 下载报告
+                            </button>
+                            <a href="{{ url_for('text_scan') }}" class="btn btn-primary">
+                                <i class="bi bi-plus"></i> 继续扫描
+                            </a>
+                            <a href="{{ url_for('upload_file') }}" class="btn btn-secondary">
+                                <i class="bi bi-upload"></i> 文件扫描
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script>
+        // 高亮敏感信息
+        function highlightSensitiveInfo() {
+            const textElement = document.getElementById('scannedText');
+            let text = textElement.textContent;
+            
+            {% for item in sensitive_items %}
+            const regex{{ loop.index }} = new RegExp('{{ item.content|e }}', 'g');
+            text = text.replace(regex{{ loop.index }}, '<span class="sensitive-highlight" title="{{ item.type }} (置信度: {{ "%.1f"|format(item.confidence * 100) }}%)">{{ item.content }}</span>');
+            {% endfor %}
+            
+            textElement.innerHTML = text;
+        }
+
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent || element.innerText;
+            
+            navigator.clipboard.writeText(text).then(function() {
+                const btn = event.target.closest('button');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="bi bi-check"></i> 已复制';
+                btn.classList.add('btn-success');
+                btn.classList.remove('btn-outline-secondary');
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-secondary');
+                }, 2000);
+            }).catch(function(err) {
+                console.error('复制失败:', err);
+                alert('复制失败，请手动复制');
+            });
+        }
+
+        function downloadResult() {
+            const result = {
+                scanTime: new Date().toISOString(),
+                riskLevel: '{{ risk_assessment.risk_level }}',
+                riskScore: {{ risk_assessment.risk_score }},
+                sensitiveCount: {{ sensitive_items|length }},
+                textContent: document.getElementById('scannedText').textContent,
+                sensitiveItems: [
+                    {% for item in sensitive_items %}
+                    {
+                        type: '{{ item.type }}',
+                        content: '{{ item.content }}',
+                        position: [{{ item.position[0] }}, {{ item.position[1] }}],
+                        confidence: {{ item.confidence }},
+                        level: '{{ item.level.value }}',
+                        action: '{{ item.action.value }}'
+                    }{% if not loop.last %},{% endif %}
+                    {% endfor %}
+                ],
+                recommendations: [
+                    {% for recommendation in risk_assessment.recommendations %}
+                    '{{ recommendation }}'{% if not loop.last %},{% endif %}
+                    {% endfor %}
+                ]
+            };
+            
+            const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'scan_result_' + new Date().getTime() + '.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        // 页面加载完成后高亮敏感信息
+        document.addEventListener('DOMContentLoaded', function() {
+            highlightSensitiveInfo();
+        });
+    </script>
+</body>
+</html>

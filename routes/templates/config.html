@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统配置 - DLP系统</title>
+    <link href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+    <style>
+        .config-section {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .policy-card {
+            border-left: 4px solid #007bff;
+            transition: all 0.3s ease;
+        }
+        .policy-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .risk-badge {
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-shield-check"></i> DLP系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('upload_file') }}">
+                            <i class="bi bi-upload"></i> 文件扫描
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('text_scan') }}">
+                            <i class="bi bi-textarea-t"></i> 文本扫描
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('data_masking') }}">
+                            <i class="bi bi-eye-slash"></i> 数据脱敏
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('scan_history') }}">
+                            <i class="bi bi-clock-history"></i> 扫描历史
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('system_config') }}">
+                            <i class="bi bi-gear"></i> 系统配置
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('custom_rules') }}">
+                            <i class="bi bi-code-slash"></i> 自定义规则
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('manual_import') }}">
+                            <i class="bi bi-journal-arrow-up"></i> 手动导入
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <div class="container mt-4">
+        <!-- 系统总览（新增） -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-speedometer2"></i> 系统总览</h5>
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('scan_history') }}">
+                            <i class="bi bi-clock-history"></i> 查看历史
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <div class="text-muted">总扫描次数</div>
+                                    <div id="cfg-total-scans" class="fs-4">-</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <div class="text-muted">成功扫描</div>
+                                    <div id="cfg-completed-scans" class="fs-4">-</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <div class="text-muted">失败扫描</div>
+                                    <div id="cfg-failed-scans" class="fs-4">-</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="p-3 bg-light rounded">
+                                    <div class="text-muted">高风险文件</div>
+                                    <div id="cfg-high-risk" class="fs-4">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 选项卡 -->
+        <ul class="nav nav-tabs" id="configTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="policies-tab" data-bs-toggle="tab" data-bs-target="#policies-panel" type="button" role="tab">
+                    <i class="bi bi-shield-exclamation"></i> 安全策略
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="system-tab" data-bs-toggle="tab" data-bs-target="#system-panel" type="button" role="tab">
+                    <i class="bi bi-gear"></i> 系统设置
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="proxy-tab" data-bs-toggle="tab" data-bs-target="#proxy-panel" type="button" role="tab">
+                    <i class="bi bi-globe"></i> 代理配置
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="performance-tab" data-bs-toggle="tab" data-bs-target="#performance-panel" type="button" role="tab">
+                    <i class="bi bi-speedometer2"></i> 性能参数
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content mt-3" id="configTabsContent">
+            <!-- 安全策略 -->
+            <div class="tab-pane fade show active" id="policies-panel" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4><i class="bi bi-shield-exclamation"></i> 安全策略管理</h4>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPolicyModal">
+                        <i class="bi bi-plus"></i> 添加策略
+                    </button>
+                </div>
+
+
+                <!-- 默认策略说明 -->
+                <div class="config-section">
+                    <h5><i class="bi bi-info-circle"></i> 默认敏感信息类型</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <i class="bi bi-person-badge"></i> 身份证号
+                                    <span class="badge bg-danger">高</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <i class="bi bi-credit-card"></i> 银行卡号
+                                    <span class="badge bg-danger">高</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <i class="bi bi-person-badge"></i> 身份证图片
+                                    <span class="badge bg-danger">高</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <i class="bi bi-credit-card"></i> 银行卡图片
+                                    <span class="badge bg-danger">高</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <i class="bi bi-telephone"></i> 手机号
+                                    <span class="badge bg-danger">高</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <i class="bi bi-person"></i> 姓名
+                                    <span class="badge bg-success">低</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <i class="bi bi-geo-alt"></i> 地址
+                                    <span class="badge bg-success">低</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <i class="bi bi-envelope"></i> 邮箱
+                                    <span class="badge bg-warning">中</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <i class="bi bi-globe"></i> IP地址
+                                    <span class="badge bg-success">低</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 自定义策略列表 -->
+                {% if policies %}
+                <div class="config-section mt-4">
+                    <h5><i class="bi bi-shield-check"></i> 自定义安全策略</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-group list-group-flush">
+                                {% for policy in policies[:((policies|length + 1) // 2)] %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-{{ 'person-badge' if policy.sensitive_type == 'ID_CARD' or policy.sensitive_type == 'ID_CARD_IMAGE' else 'credit-card' if policy.sensitive_type == 'BANK_CARD' or policy.sensitive_type == 'BANK_CARD_IMAGE' else 'telephone' if policy.sensitive_type == 'MOBILE_PHONE' else 'person' if policy.sensitive_type == 'NAME' else 'geo-alt' if policy.sensitive_type == 'ADDRESS' else 'envelope' if policy.sensitive_type == 'EMAIL' else 'globe' if policy.sensitive_type == 'IP_ADDRESS' else 'tag' }} me-2"></i>
+                                        <span>{{ policy.name }}</span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-{{ 'danger' if policy.sensitivity_level == '极高' or policy.sensitivity_level == '高' else 'warning' if policy.sensitivity_level == '中' else 'success' }}">{{ policy.sensitivity_level }}</span>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="editPolicy({{ policy.id }})" title="编辑">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deletePolicy({{ policy.id }})" title="删除">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-group list-group-flush">
+                                {% for policy in policies[((policies|length + 1) // 2):] %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-{{ 'person-badge' if policy.sensitive_type == 'ID_CARD' or policy.sensitive_type == 'ID_CARD_IMAGE' else 'credit-card' if policy.sensitive_type == 'BANK_CARD' or policy.sensitive_type == 'BANK_CARD_IMAGE' else 'telephone' if policy.sensitive_type == 'MOBILE_PHONE' else 'person' if policy.sensitive_type == 'NAME' else 'geo-alt' if policy.sensitive_type == 'ADDRESS' else 'envelope' if policy.sensitive_type == 'EMAIL' else 'globe' if policy.sensitive_type == 'IP_ADDRESS' else 'tag' }} me-2"></i>
+                                        <span>{{ policy.name }}</span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-{{ 'danger' if policy.sensitivity_level == '极高' or policy.sensitivity_level == '高' else 'warning' if policy.sensitivity_level == '中' else 'success' }}">{{ policy.sensitivity_level }}</span>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="editPolicy({{ policy.id }})" title="编辑">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deletePolicy({{ policy.id }})" title="删除">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- 系统设置 -->
+            <div class="tab-pane fade" id="system-panel" role="tabpanel">
+                <h4><i class="bi bi-gear"></i> 系统设置</h4>
+                
+                <div class="config-section">
+                    <h5>文件上传设置</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">最大文件大小 (MB)</label>
+                                <input type="number" class="form-control" id="maxFileSize" name="max_file_size" value="16" min="1" max="100">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">允许的文件类型</label>
+                                <input type="text" class="form-control" id="allowedFileTypes" name="allowed_file_types" value="pdf,docx,doc,png,jpg,jpeg,gif,bmp,json,csv,txt">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h5>扫描设置</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">默认置信度阈值</label>
+                                <input type="number" class="form-control" id="defaultThreshold" name="default_threshold" value="0.8" min="0" max="1" step="0.1">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">最大处理时间 (秒)</label>
+                                <input type="number" class="form-control" id="maxProcessingTime" name="max_processing_time" value="300" min="60" max="3600">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h5>通知设置</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="emailNotifications" name="email_notifications" checked>
+                                <label class="form-check-label" for="emailNotifications">
+                                    启用邮件通知
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="auditLogging" name="audit_logging" checked>
+                                <label class="form-check-label" for="auditLogging">
+                                    启用审计日志
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 代理配置 -->
+            <div class="tab-pane fade" id="proxy-panel" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4><i class="bi bi-globe"></i> 代理配置</h4>
+                    <button class="btn btn-success" onclick="saveProxyConfig()">
+                        <i class="bi bi-check"></i> 保存配置
+                    </button>
+                </div>
+                
+                <div class="config-section">
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="enableProxy" name="enable_proxy">
+                        <label class="form-check-label" for="enableProxy">
+                            启用代理
+                        </label>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">HTTP代理</label>
+                                <input type="text" class="form-control" id="httpProxy" name="http_proxy" placeholder="http://proxy.example.com:8080">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">HTTPS代理</label>
+                                <input type="text" class="form-control" id="httpsProxy" name="https_proxy" placeholder="https://proxy.example.com:8080">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">代理用户名</label>
+                                <input type="text" class="form-control" id="proxyUsername" name="proxy_username" placeholder="username">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">代理密码</label>
+                                <input type="password" class="form-control" id="proxyPassword" name="proxy_password" placeholder="password">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 性能参数 -->
+            <div class="tab-pane fade" id="performance-panel" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4><i class="bi bi-speedometer2"></i> 性能参数</h4>
+                    <button class="btn btn-success" onclick="savePerformanceConfig()">
+                        <i class="bi bi-check"></i> 保存配置
+                    </button>
+                </div>
+                
+                <div class="config-section">
+                    <h5>并发设置</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">最大并发任务数</label>
+                                <input type="number" class="form-control" id="maxConcurrentTasks" name="max_concurrent_tasks" value="5" min="1" max="20">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">队列大小</label>
+                                <input type="number" class="form-control" id="queueSize" name="queue_size" value="100" min="10" max="1000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h5>资源限制</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">内存使用限制 (MB)</label>
+                                <input type="number" class="form-control" id="memoryLimit" name="memory_limit" value="512" min="128" max="2048">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">CPU使用限制 (%)</label>
+                                <input type="number" class="form-control" id="cpuLimit" name="cpu_limit" value="80" min="10" max="100">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h5>缓存设置</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">缓存大小 (MB)</label>
+                                <input type="number" class="form-control" id="cacheSize" name="cache_size" value="256" min="64" max="1024">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">缓存过期时间 (分钟)</label>
+                                <input type="number" class="form-control" id="cacheExpiry" name="cache_expiry" value="60" min="10" max="1440">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 敏感类型权重配置 -->
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-sliders"></i> 敏感类型权重配置</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="loadWeights()">刷新</button>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label">敏感类型</label>
+                        <select class="form-select" id="weightTypeSelect"></select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">权重（浮点数）</label>
+                        <input type="number" step="0.01" class="form-control" id="weightValueInput" placeholder="如 0.08">
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-primary w-100" onclick="saveWeight()">保存</button>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <small class="text-muted">提示：未配置的类型使用默认权重；自定义规则类型形如 CUSTOM_规则名。</small>
+                </div>
+                <div class="mt-3" id="currentWeights"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加/编辑策略模态框 -->
+    <div class="modal fade" id="addPolicyModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="policyModalTitle">添加安全策略</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" onclick="resetPolicyForm()"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addPolicyForm">
+                        <input type="hidden" id="policyId" name="policy_id" value="">
+                        <div class="mb-3">
+                            <label class="form-label">策略名称</label>
+                            <input type="text" class="form-control" name="name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">描述</label>
+                            <textarea class="form-control" name="description" rows="3"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">敏感信息类型</label>
+                            <select class="form-select" name="sensitive_type" id="policySensitiveType" required>
+                                <optgroup label="系统内置类型">
+                                <option value="ID_CARD">身份证号</option>
+                                <option value="BANK_CARD">银行卡号</option>
+                                    <option value="ID_CARD_IMAGE">身份证图片</option>
+                                    <option value="BANK_CARD_IMAGE">银行卡图片</option>
+                                <option value="MOBILE_PHONE">手机号</option>
+                                <option value="NAME">姓名</option>
+                                <option value="ADDRESS">地址</option>
+                                <option value="EMAIL">邮箱</option>
+                                <option value="IP_ADDRESS">IP地址</option>
+                                </optgroup>
+                                <optgroup label="自定义规则类型" id="customRuleTypes">
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">敏感级别</label>
+                            <select class="form-select" name="sensitivity_level" id="policySensitivityLevel" required>
+                                <option value="LOW">低</option>
+                                <option value="MEDIUM">中</option>
+                                <option value="HIGH">高</option>
+                                <option value="CRITICAL">极高</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">处置建议</label>
+                            <select class="form-select" name="action_type" id="policyActionType" required>
+                                <option value="LOG_ONLY">仅记录</option>
+                                <option value="MASK_DATA">数据脱敏</option>
+                                <option value="BLOCK_ACCESS">阻止访问</option>
+                                <option value="DELETE_DATA">删除数据</option>
+                                <option value="NOTIFY_ADMIN">通知管理员</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">识别阈值</label>
+                            <input type="number" class="form-control" name="threshold" value="0.8" min="0" max="1" step="0.1">
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="enabled" checked>
+                            <label class="form-check-label">启用策略</label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="submitPolicyBtn" onclick="submitPolicy()">添加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script>
+        function submitPolicy() {
+            const form = document.getElementById('addPolicyForm');
+            const formData = new FormData(form);
+            const policyId = document.getElementById('policyId').value;
+            const isEdit = policyId !== '';
+            
+            const url = isEdit ? '/api/policy/update' : '/api/policy/add';
+            const method = isEdit ? 'PUT' : 'POST';
+            
+            // 如果是编辑模式，需要添加policy_id
+            if (isEdit) {
+                formData.append('policy_id', policyId);
+            }
+            
+            // 发送AJAX请求到后端
+            fetch(url, {
+                method: method,
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+            // 关闭模态框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addPolicyModal'));
+            modal.hide();
+                    // 重置表单和状态
+                    form.reset();
+                    document.getElementById('policyId').value = '';
+                    document.getElementById('policyModalTitle').textContent = '添加安全策略';
+                    document.getElementById('submitPolicyBtn').textContent = '添加';
+                    // 重新加载下拉选项
+                    loadPolicyFormOptions();
+                    // 刷新页面以显示新策略
+            location.reload();
+                } else {
+                    alert((isEdit ? '更新' : '添加') + '策略失败: ' + (data.error || '未知错误'));
+                }
+            })
+            .catch(error => {
+                console.error((isEdit ? '更新' : '添加') + '策略错误:', error);
+                alert((isEdit ? '更新' : '添加') + '策略失败，请稍后重试');
+            });
+        }
+
+        function editPolicy(policyId) {
+            // 获取策略详情
+            fetch(`/api/policy/${policyId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const policy = data.policy;
+                        
+                        // 填充表单
+                        document.getElementById('policyId').value = policy.id;
+                        document.querySelector('input[name="name"]').value = policy.name || '';
+                        document.querySelector('textarea[name="description"]').value = policy.description || '';
+                        document.getElementById('policySensitiveType').value = policy.sensitive_type || '';
+                        
+                        // 设置敏感级别：如果是枚举值，使用枚举键；否则使用字符串值
+                        const sensitivitySelect = document.getElementById('policySensitivityLevel');
+                        let sensitivityValue = policy.sensitivity_level || '';
+                        // 尝试匹配枚举值
+                        const enumValues = {'低': 'LOW', '中': 'MEDIUM', '高': 'HIGH', '极高': 'CRITICAL'};
+                        if (enumValues[sensitivityValue]) {
+                            sensitivityValue = enumValues[sensitivityValue];
+                        }
+                        sensitivitySelect.value = sensitivityValue;
+                        // 如果值不在选项中，添加它
+                        if (!Array.from(sensitivitySelect.options).some(opt => opt.value === policy.sensitivity_level)) {
+                            const option = document.createElement('option');
+                            option.value = policy.sensitivity_level;
+                            option.textContent = policy.sensitivity_level;
+                            sensitivitySelect.appendChild(option);
+                            sensitivitySelect.value = policy.sensitivity_level;
+                        }
+                        
+                        // 设置处置建议：如果是枚举值，使用枚举键；否则使用字符串值
+                        const actionSelect = document.getElementById('policyActionType');
+                        let actionValue = policy.action_type || '';
+                        // 尝试匹配枚举值
+                        const enumActions = {'仅记录': 'LOG_ONLY', '数据脱敏': 'MASK_DATA', '阻止访问': 'BLOCK_ACCESS', '删除数据': 'DELETE_DATA', '通知管理员': 'NOTIFY_ADMIN'};
+                        if (enumActions[actionValue]) {
+                            actionValue = enumActions[actionValue];
+                        }
+                        actionSelect.value = actionValue;
+                        // 如果值不在选项中，添加它
+                        if (!Array.from(actionSelect.options).some(opt => opt.value === policy.action_type || opt.textContent === policy.action_type)) {
+                            const option = document.createElement('option');
+                            option.value = policy.action_type;
+                            option.textContent = policy.action_type;
+                            actionSelect.appendChild(option);
+                            actionSelect.value = policy.action_type;
+                        }
+                        
+                        document.querySelector('input[name="threshold"]').value = policy.threshold || 0.8;
+                        document.querySelector('input[name="enabled"]').checked = policy.enabled !== false;
+                        
+                        // 更新模态框标题和按钮
+                        document.getElementById('policyModalTitle').textContent = '编辑安全策略';
+                        document.getElementById('submitPolicyBtn').textContent = '保存';
+                        
+                        // 显示模态框
+                        const modal = new bootstrap.Modal(document.getElementById('addPolicyModal'));
+                        modal.show();
+                    } else {
+                        alert('获取策略信息失败: ' + (data.error || '未知错误'));
+                    }
+                })
+                .catch(error => {
+                    console.error('获取策略信息错误:', error);
+                    alert('获取策略信息失败，请稍后重试');
+                });
+        }
+
+        function deletePolicy(policyId) {
+            if (confirm('确定要删除这个策略吗？')) {
+                fetch('/api/policy/delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ policy_id: policyId })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                location.reload();
+                    } else {
+                        alert('删除策略失败: ' + (data.error || '未知错误'));
+                    }
+                })
+                .catch(error => {
+                    console.error('删除策略错误:', error);
+                    alert('删除策略失败，请稍后重试');
+                });
+            }
+        }
+
+        // 系统总览：从 /api/scan_stats 拉取
+        fetch('/api/scan_stats')
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById('cfg-total-scans').textContent = d.total_scans ?? '-';
+                document.getElementById('cfg-completed-scans').textContent = d.completed_scans ?? '-';
+                document.getElementById('cfg-failed-scans').textContent = d.failed_scans ?? '-';
+                const high = (d.risk_levels && (d.risk_levels['高'] || 0)) + (d.risk_levels && (d.risk_levels['极高'] || 0));
+                document.getElementById('cfg-high-risk').textContent = high ?? '-';
+            })
+            .catch(() => {});
+
+        // 加载自定义规则类型和预设值
+        function loadPolicyFormOptions() {
+            // 加载自定义规则类型
+            fetch('/api/custom_rules')
+                .then(r => r.json())
+                .then(d => {
+                    if (d.success && d.rules) {
+                        const customGroup = document.getElementById('customRuleTypes');
+                        customGroup.innerHTML = '';
+                        d.rules.forEach(rule => {
+                            const option = document.createElement('option');
+                            option.value = `CUSTOM_${rule.name}`;
+                            option.textContent = `${rule.name} (自定义)`;
+                            customGroup.appendChild(option);
+                        });
+                    }
+                })
+                .catch(() => {});
+
+            // 加载预设值（敏感级别和处置建议）
+            fetch('/api/presets')
+                .then(r => r.json())
+                .then(d => {
+                    if (d.success && d.data) {
+                        // 更新敏感级别下拉选项
+                        const sensitivitySelect = document.getElementById('policySensitivityLevel');
+                        const presetLevels = d.data.sensitivity_level || [];
+                        presetLevels.forEach(level => {
+                            // 检查是否已存在（避免重复）
+                            const exists = Array.from(sensitivitySelect.options).some(opt => opt.value === level || opt.textContent === level);
+                            if (!exists) {
+                                const option = document.createElement('option');
+                                option.value = level;
+                                option.textContent = level;
+                                sensitivitySelect.appendChild(option);
+                            }
+                        });
+
+                        // 更新处置建议下拉选项
+                        const actionSelect = document.getElementById('policyActionType');
+                        const presetActions = d.data.processing_advice || [];
+                        presetActions.forEach(action => {
+                            // 检查是否已存在（避免重复）
+                            const exists = Array.from(actionSelect.options).some(opt => opt.value === action || opt.textContent === action);
+                            if (!exists) {
+                                const option = document.createElement('option');
+                                option.value = action;
+                                option.textContent = action;
+                                actionSelect.appendChild(option);
+                            }
+                        });
+                    }
+                })
+                .catch(() => {});
+        }
+
+        // 页面加载时初始化
+        loadPolicyFormOptions();
+        loadWeights();
+        
+        // 重置表单函数
+        function resetPolicyForm() {
+            const form = document.getElementById('addPolicyForm');
+            form.reset();
+            document.getElementById('policyId').value = '';
+            document.getElementById('policyModalTitle').textContent = '添加安全策略';
+            document.getElementById('submitPolicyBtn').textContent = '添加';
+        }
+        
+        // 模态框关闭时重置表单
+        document.getElementById('addPolicyModal').addEventListener('hidden.bs.modal', function() {
+            resetPolicyForm();
+        });
+
+        // 保存系统设置
+        function saveSystemConfig() {
+            const config = {
+                max_file_size: document.getElementById('maxFileSize').value,
+                allowed_file_types: document.getElementById('allowedFileTypes').value,
+                default_threshold: document.getElementById('defaultThreshold').value,
+                max_processing_time: document.getElementById('maxProcessingTime').value,
+                email_notifications: document.getElementById('emailNotifications').checked,
+                audit_logging: document.getElementById('auditLogging').checked
+            };
+            
+            fetch('/api/config/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({category: 'system', config: config})
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    alert('系统设置保存成功！');
+                } else {
+                    alert('保存失败: ' + (d.error || '未知错误'));
+                }
+            })
+            .catch(error => {
+                console.error('保存错误:', error);
+                alert('保存失败，请稍后重试');
+            });
+        }
+
+        // 保存代理配置
+        function saveProxyConfig() {
+            const config = {
+                enable_proxy: document.getElementById('enableProxy').checked,
+                http_proxy: document.getElementById('httpProxy').value,
+                https_proxy: document.getElementById('httpsProxy').value,
+                proxy_username: document.getElementById('proxyUsername').value,
+                proxy_password: document.getElementById('proxyPassword').value
+            };
+            
+            fetch('/api/config/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({category: 'proxy', config: config})
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    alert('代理配置保存成功！');
+                } else {
+                    alert('保存失败: ' + (d.error || '未知错误'));
+                }
+            })
+            .catch(error => {
+                console.error('保存错误:', error);
+                alert('保存失败，请稍后重试');
+            });
+        }
+
+        // 保存性能参数
+        function savePerformanceConfig() {
+            const config = {
+                max_concurrent_tasks: document.getElementById('maxConcurrentTasks').value,
+                queue_size: document.getElementById('queueSize').value,
+                memory_limit: document.getElementById('memoryLimit').value,
+                cpu_limit: document.getElementById('cpuLimit').value,
+                cache_size: document.getElementById('cacheSize').value,
+                cache_expiry: document.getElementById('cacheExpiry').value
+            };
+            
+            fetch('/api/config/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({category: 'performance', config: config})
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    alert('性能参数保存成功！');
+                } else {
+                    alert('保存失败: ' + (d.error || '未知错误'));
+                }
+            })
+            .catch(error => {
+                console.error('保存错误:', error);
+                alert('保存失败，请稍后重试');
+            });
+        }
+
+        // 权重配置：加载&保存
+        function loadWeights(){
+            fetch('/api/weights').then(r=>r.json()).then(d=>{
+                if(!d.success) return;
+                const sel = document.getElementById('weightTypeSelect');
+                sel.innerHTML='';
+                (d.types||[]).forEach(t=>{
+                    const opt=document.createElement('option'); opt.value=t; opt.textContent=t; sel.appendChild(opt);
+                });
+                // 展示权重（已配置/默认）
+                const wrap = document.getElementById('currentWeights');
+                const weights = d.weights||{};
+                const defaults = d.default_weights||{};
+                const ul = document.createElement('ul'); ul.className='list-group';
+                (d.types||[]).forEach(k=>{
+                    const configured = (k in weights);
+                    const v = configured ? weights[k] : '';
+                    const defv = (k in defaults) && defaults[k] !== null && defaults[k] !== undefined ? defaults[k] : '未定义';
+                    const li=document.createElement('li'); li.className='list-group-item d-flex justify-content-between align-items-center';
+                    const left=document.createElement('div'); left.textContent = k;
+                    const right=document.createElement('div');
+                    const badgeDef=document.createElement('span'); badgeDef.className='badge bg-secondary me-2'; badgeDef.textContent = `默认: ${defv}`;
+                    right.appendChild(badgeDef);
+                    if(configured){
+                        const badgeCfg=document.createElement('span'); badgeCfg.className='badge bg-primary'; badgeCfg.textContent = `已配置: ${v}`; right.appendChild(badgeCfg);
+                    }
+                    li.appendChild(left); li.appendChild(right); ul.appendChild(li);
+                });
+                wrap.innerHTML=''; wrap.appendChild(ul);
+
+                // 切换类型时，自动带出已配置或默认值
+                sel.onchange = function(){
+                    const t = sel.value;
+                    const v = (weights && (t in weights)) ? weights[t] : (defaults && (t in defaults) ? defaults[t] : '');
+                    const input = document.getElementById('weightValueInput');
+                    input.value = v!==null && v!==undefined ? v : '';
+                    input.placeholder = v!=='' ? v : '如 0.08';
+                };
+                // 触发一次默认选择
+                sel.dispatchEvent(new Event('change'));
+            }).catch(()=>{});
+        }
+        function saveWeight(){
+            const t = document.getElementById('weightTypeSelect').value;
+            const w = document.getElementById('weightValueInput').value;
+            if(!t || !w){ alert('请选择类型并输入权重'); return; }
+            fetch('/api/weights/save',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type:t, weight:w})})
+              .then(r=>r.json()).then(d=>{ if(d.success){ loadWeights(); } else { alert(d.error||'保存失败'); } })
+              .catch(()=>alert('网络错误'));
+        }
+    </script>
+</body>
+</html>

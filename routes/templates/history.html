@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扫描历史 - DLP系统</title>
+    <link href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+    <style>
+        .scan-list-item {
+            transition: all 0.2s ease;
+            border-left: 3px solid #007bff;
+        }
+        .scan-list-item:hover {
+            background-color: #f8f9fa;
+            border-left-color: #0056b3;
+        }
+        .status-badge {
+            font-size: 0.75rem;
+        }
+        .risk-badge {
+            font-size: 0.75rem;
+        }
+        .table-hover tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-shield-check"></i> DLP系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('upload_file') }}">
+                            <i class="bi bi-upload"></i> 文件扫描
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('text_scan') }}">
+                            <i class="bi bi-textarea-t"></i> 文本扫描
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('data_masking') }}">
+                            <i class="bi bi-eye-slash"></i> 数据脱敏
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('scan_history') }}">
+                            <i class="bi bi-clock-history"></i> 扫描历史
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('system_config') }}">
+                            <i class="bi bi-gear"></i> 系统配置
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('custom_rules') }}">
+                            <i class="bi bi-code-slash"></i> 自定义规则
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('manual_import') }}">
+                            <i class="bi bi-journal-arrow-up"></i> 手动导入
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-clock-history"></i> 扫描历史</h2>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary" onclick="refreshHistory()">
+                    <i class="bi bi-arrow-clockwise"></i> 刷新
+                </button>
+                <button class="btn btn-outline-success" onclick="exportCurrentFiltersCSV()">
+                    <i class="bi bi-download"></i> 导出当前筛选结果CSV
+                </button>
+                <button class="btn btn-outline-secondary" onclick="bulkMarkOpen()">
+                    <i class="bi bi-tags"></i> 批量标记
+                </button>
+                <button class="btn btn-outline-danger" onclick="clearHistory()">
+                    <i class="bi bi-trash"></i> 清空历史
+                </button>
+            </div>
+        </div>
+
+        <!-- 统计信息 -->
+        <div class="row mb-3">
+            <div class="col-md-12">
+                <strong>全局敏感类型统计：</strong>
+                {% for stype, count in stype_counts_global.items() %}
+                <span class="badge bg-danger me-1">{{ stype }}({{ count }})</span>
+                {% endfor %}
+                <span class="mx-3"></span>
+                <strong>全局风险：</strong>
+                {% for risk, count in risk_level_counts.items() %}
+                <span class="badge bg-{{ 'danger' if risk=='极高' else 'warning' if risk=='高' else 'info' if risk=='中' else 'secondary' if risk=='低' else 'success' if risk=='无' else 'secondary' }} me-1">
+                    {{ risk }}{% if risk != '无' %}风险{% endif %}({{ count }})
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 统计信息 -->
+        <div class="row mb-2">
+            <div class="col"><strong>敏感类型聚合（本页）:</strong>
+                {% for stype, count in stype_counts.items() %}
+                <span class="badge bg-danger me-1">{{ stype }}({{ count }})</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 筛选器 -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('scan_history') }}" id="filterForm">
+                    <div class="row g-3">
+                        <div class="col-md-2">
+                            <label class="form-label">文件类型</label>
+                            <select class="form-select form-select-sm" name="file_type" id="fileTypeFilter">
+                                <option value="">全部类型</option>
+                                <option value="pdf" {{ 'selected' if request.args.get('file_type') == 'pdf' else '' }}>PDF</option>
+                                <option value="docx" {{ 'selected' if request.args.get('file_type') == 'docx' else '' }}>DOCX</option>
+                                <option value="txt" {{ 'selected' if request.args.get('file_type') == 'txt' else '' }}>TXT</option>
+                                <option value="json" {{ 'selected' if request.args.get('file_type') == 'json' else '' }}>JSON</option>
+                                <option value="csv" {{ 'selected' if request.args.get('file_type') == 'csv' else '' }}>CSV</option>
+                                <option value="jpg" {{ 'selected' if request.args.get('file_type') == 'jpg' else '' }}>JPG</option>
+                                <option value="png" {{ 'selected' if request.args.get('file_type') == 'png' else '' }}>PNG</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">扫描状态</label>
+                            <select class="form-select form-select-sm" name="status" id="statusFilter">
+                                <option value="">全部状态</option>
+                                <option value="completed" {{ 'selected' if request.args.get('status') == 'completed' else '' }}>已完成</option>
+                                <option value="processing" {{ 'selected' if request.args.get('status') == 'processing' else '' }}>处理中</option>
+                                <option value="failed" {{ 'selected' if request.args.get('status') == 'failed' else '' }}>失败</option>
+                                <option value="pending" {{ 'selected' if request.args.get('status') == 'pending' else '' }}>等待中</option>
+                                <option value="manual" {{ 'selected' if request.args.get('status') == 'manual' else '' }}>手动导入</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">风险等级</label>
+                            <select class="form-select form-select-sm" name="risk" id="riskFilter">
+                                <option value="">全部等级</option>
+                                <option value="无" {{ 'selected' if request.args.get('risk') == '无' else '' }}>无风险</option>
+                                <option value="低" {{ 'selected' if request.args.get('risk') == '低' else '' }}>低风险</option>
+                                <option value="中" {{ 'selected' if request.args.get('risk') == '中' else '' }}>中风险</option>
+                                <option value="高" {{ 'selected' if request.args.get('risk') == '高' else '' }}>高风险</option>
+                                <option value="极高" {{ 'selected' if request.args.get('risk') == '极高' else '' }}>极高风险</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">业务类型</label>
+                            <select class="form-select form-select-sm" name="business_type" id="businessTypeFilter">
+                                <option value="">全部</option>
+                                <option value="unmarked" {{ 'selected' if request.args.get('business_type') == 'unmarked' else '' }}>未标记</option>
+                                {% for bt in business_types_list %}
+                                <option value="{{ bt }}" {{ 'selected' if request.args.get('business_type') == bt else '' }}>{{ bt }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">所属部门</label>
+                            <select class="form-select form-select-sm" name="department" id="departmentFilter">
+                                <option value="">全部</option>
+                                <option value="unmarked" {{ 'selected' if request.args.get('department') == 'unmarked' else '' }}>未标记</option>
+                                {% for dept in departments_list %}
+                                <option value="{{ dept }}" {{ 'selected' if request.args.get('department') == dept else '' }}>{{ dept }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">敏感类型</label>
+                            <select class="form-select form-select-sm" name="stype" id="stypeFilter">
+                                <option value="">全部类型</option>
+                                {% for stype in sensitive_types_all %}
+                                <option value="{{ stype }}" {{ 'selected' if request.args.get('stype') == stype else '' }}>{{ stype }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-search"></i> 筛选
+                                </button>
+                                <a href="{{ url_for('scan_history') }}" class="btn btn-secondary btn-sm">
+                                    <i class="bi bi-x"></i> 重置
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 扫描记录列表 -->
+        {% if scans.items %}
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 40px;">
+                                    <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                                </th>
+                                <th>文件名</th>
+                                <th style="width: 100px;">文件类型</th>
+                                <th style="width: 120px;">业务类型</th>
+                                <th style="width: 120px;">所属部门</th>
+                                <th style="width: 100px;">扫描时间</th>
+                                <th style="width: 80px;">状态</th>
+                                <th style="width: 100px;">风险等级</th>
+                                <th style="width: 100px;">敏感数量</th>
+                                <th style="width: 100px;">文件大小</th>
+                                <th style="width: 200px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for scan in scans.items %}
+                            <tr class="scan-list-item scan-row" 
+                                data-file-type="{{ scan.file_type }}" 
+                                data-status="{{ scan.scan_status }}" 
+                                data-risk="{{ scan.risk_level }}"
+                                data-mark="{{ 'marked' if scan.business_info else 'unmarked' }}"
+                                data-id="{{ scan.id }}"
+                                data-name="{{ scan.file_name }}"
+                                data-types="{{ scan.sensitive_types or '' }}"
+                                data-time="{{ scan.scan_time.strftime('%Y-%m-%d %H:%M') }}"
+                                data-business-type="{{ scan.business_info.business_type if scan.business_info else '未标记' }}"
+                                data-department="{{ scan.business_info.department if scan.business_info else '未标记' }}">
+                                <td>
+                                    <input class="form-check-input select-scan" type="checkbox" value="{{ scan.id }}">
+                                </td>
+                                <td>
+                                    <strong>{{ scan.file_name }}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ scan.file_type.upper() }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'info' if scan.business_info and scan.business_info.business_type else 'secondary' }}">
+                                        {{ scan.business_info.business_type if scan.business_info and scan.business_info.business_type else '未标记' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'info' if scan.business_info and scan.business_info.department else 'secondary' }}">
+                                        {{ scan.business_info.department if scan.business_info and scan.business_info.department else '未标记' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <small>{{ scan.scan_time.strftime('%Y-%m-%d %H:%M') }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if scan.scan_status == 'completed' else 'warning' if scan.scan_status == 'processing' else 'info' if scan.scan_status == 'manual' else 'danger' }} status-badge">
+                                        {{ scan.scan_status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'danger' if scan.risk_level == '极高' else 'warning' if scan.risk_level == '高' else 'info' if scan.risk_level == '中' else 'secondary' if scan.risk_level == '低' else 'success' if scan.risk_level == '无' else 'secondary' }} risk-badge">
+                                        {{ scan.risk_level }}{% if scan.risk_level != '无' %} 风险{% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if scan.sensitive_count > 0 %}
+                                    <span class="badge bg-danger">{{ scan.sensitive_count }}</span>
+                                    {% else %}
+                                    <span class="badge bg-success">0</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small>{{ "%.2f"|format(scan.file_size / 1024 / 1024) }} MB</small>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{{ url_for('scan_result', scan_id=scan.id) }}" class="btn btn-outline-primary" title="查看详情">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        {% if scan.scan_status == 'completed' %}
+                                        <a href="{{ url_for('business_classification', scan_id=scan.id) }}" class="btn btn-outline-secondary" title="{{ '编辑标记' if scan.business_info else '去标记' }}">
+                                            <i class="bi bi-tags"></i>
+                                        </a>
+                                        {% endif %}
+                                        <button class="btn btn-outline-danger delete-history-btn" 
+                                                data-scan-id="{{ scan.id }}" 
+                                                data-file-name="{{ scan.file_name }}"
+                                                title="删除">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分页 -->
+        {% if scans.pages > 1 %}
+        <nav aria-label="扫描历史分页" class="mt-3">
+            <ul class="pagination justify-content-center">
+                {% if scans.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('scan_history', page=scans.prev_num, **request.args) }}">上一页</a>
+                </li>
+                {% endif %}
+                
+                {% for page_num in scans.iter_pages() %}
+                    {% if page_num %}
+                        {% if page_num != scans.page %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('scan_history', page=page_num, **request.args) }}">{{ page_num }}</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_num }}</span>
+                        </li>
+                        {% endif %}
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if scans.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('scan_history', page=scans.next_num, **request.args) }}">下一页</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox" style="font-size: 4rem; color: #6c757d;"></i>
+            <h4 class="mt-3 text-muted">暂无扫描记录</h4>
+            <p class="text-muted">开始扫描文件以查看历史记录</p>
+            <a href="{{ url_for('upload_file') }}" class="btn btn-primary">
+                <i class="bi bi-upload"></i> 开始扫描
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 批量标记模态框 -->
+    <div class="modal fade" id="bulkMarkModal" tabindex="-1" aria-labelledby="bulkMarkModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bulkMarkModalLabel">
+                        <i class="bi bi-tags"></i> 批量标记
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 您已选择 <strong id="selectedCount">0</strong> 个文件，以下标记信息将应用到所有选中的文件。
+                    </div>
+                    <form id="bulkMarkForm">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">业务类型 *</label>
+                                <select class="form-select" name="business_type" id="bulkBusinessType" required>
+                                    <option value="">请选择业务类型</option>
+                                    <option value="财务">财务</option>
+                                    <option value="人事">人事</option>
+                                    <option value="客户">客户</option>
+                                    <option value="合同">合同</option>
+                                    <option value="技术">技术</option>
+                                    <option value="运营">运营</option>
+                                    <option value="法务">法务</option>
+                                    <option value="其他">其他</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">所属部门</label>
+                                <select class="form-select" name="department" id="bulkDepartment">
+                                    <option value="">请选择部门</option>
+                                    <option value="财务部">财务部</option>
+                                    <option value="人事部">人事部</option>
+                                    <option value="销售部">销售部</option>
+                                    <option value="技术部">技术部</option>
+                                    <option value="运营部">运营部</option>
+                                    <option value="法务部">法务部</option>
+                                    <option value="行政部">行政部</option>
+                                    <option value="其他">其他</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">负责人</label>
+                                <input type="text" class="form-control" name="owner" id="bulkOwner" placeholder="请输入负责人姓名">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">文件分类</label>
+                                <select class="form-select" name="classification" id="bulkClassification">
+                                    <option value="">请选择文件分类</option>
+                                    <option value="机密">机密</option>
+                                    <option value="内部">内部</option>
+                                    <option value="公开">公开</option>
+                                    <option value="受限">受限</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">保留期限 (天)</label>
+                                <input type="number" class="form-control" name="retention_period" id="bulkRetentionPeriod" placeholder="请输入保留期限" min="1" max="3650">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">处理建议</label>
+                                <select class="form-select" name="processing_advice" id="bulkProcessingAdvice">
+                                    <option value="">请选择处理建议</option>
+                                    <option value="正常存储">正常存储</option>
+                                    <option value="加密存储">加密存储</option>
+                                    <option value="定期审查">定期审查</option>
+                                    <option value="立即处理">立即处理</option>
+                                    <option value="限制访问">限制访问</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">敏感等级</label>
+                                <select class="form-select" name="sensitivity_level" id="bulkSensitivityLevel">
+                                    <option value="">请选择敏感等级</option>
+                                    <option value="低">低</option>
+                                    <option value="中">中</option>
+                                    <option value="高">高</option>
+                                    <option value="极高">极高</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">入库时间</label>
+                                <input type="datetime-local" class="form-control" name="entry_time" id="bulkEntryTime">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">备注</label>
+                            <textarea class="form-control" name="notes" id="bulkNotes" rows="3" placeholder="请输入备注信息..."></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="submitBulkMark()">
+                        <i class="bi bi-check"></i> 确认批量标记
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script>
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.select-scan');
+            checkboxes.forEach(cb => {
+                cb.checked = selectAll.checked;
+            });
+        }
+
+        function refreshHistory() {
+            location.reload();
+        }
+
+        function exportCurrentFiltersCSV() {
+            // 获取当前筛选参数
+            const params = new URLSearchParams(window.location.search);
+            params.set('export', 'csv');
+            window.location.href = '{{ url_for("scan_history") }}?' + params.toString();
+        }
+
+        function clearHistory() {
+            if (confirm('确定要清空所有扫描历史吗？此操作不可恢复！')) {
+                fetch('/api/history/clear', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message || '历史记录已清空！');
+                        location.reload();
+                    } else {
+                        alert('清空失败: ' + (data.error || '未知错误'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('清空请求失败，请稍后重试');
+                });
+            }
+        }
+
+        // 使用事件委托处理删除按钮点击
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.delete-history-btn');
+            if (btn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const scanId = btn.getAttribute('data-scan-id');
+                const fileName = btn.getAttribute('data-file-name');
+                deleteHistory(parseInt(scanId), fileName);
+            }
+        });
+
+        function deleteHistory(scanId, fileName) {
+            if (confirm(`确定要删除记录 "${fileName}" 吗？此操作不可恢复！`)) {
+                fetch(`/api/history/${scanId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 找到对应的行并移除
+                        const row = document.querySelector(`tr[data-id="${scanId}"]`);
+                        if (row) {
+                            row.style.transition = 'opacity 0.3s';
+                            row.style.opacity = '0';
+                            setTimeout(() => {
+                                row.remove();
+                                // 如果列表为空，刷新页面
+                                if (document.querySelectorAll('.scan-row').length === 0) {
+                                    location.reload();
+                                }
+                            }, 300);
+                        } else {
+                            location.reload();
+                        }
+                    } else {
+                        alert('删除失败: ' + (data.error || '未知错误'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('删除请求失败，请稍后重试');
+                });
+            }
+        }
+
+        function bulkMarkOpen(){
+            const checked = Array.from(document.querySelectorAll('.select-scan:checked'));
+            if(checked.length === 0){ 
+                alert('请先勾选要标记的记录'); 
+                return; 
+            }
+            
+            // 显示选中的文件数量
+            document.getElementById('selectedCount').textContent = checked.length;
+            
+            // 重置表单
+            document.getElementById('bulkMarkForm').reset();
+            
+            // 设置默认入库时间为当前时间
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('bulkEntryTime').value = now.toISOString().slice(0, 16);
+            
+            // 加载动态预设选项
+            loadBulkMarkPresets();
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('bulkMarkModal'));
+            modal.show();
+        }
+
+        function loadBulkMarkPresets() {
+            // 从后端API获取预设选项，复用单个标记页面的逻辑
+            fetch('/api/presets')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) return;
+                    
+                    const presets = data.data || {};
+                    
+                    // 复用单个标记页面的fill函数逻辑
+                    const fill = (id, arr) => {
+                        const sel = document.getElementById(id) || document.querySelector(`[name="${id}"]`);
+                        if (!sel || !Array.isArray(arr)) return;
+                        const cur = sel.value;
+                        arr.forEach(v => {
+                            // 如果选项已存在，则跳过（不覆盖原有选项）
+                            if ([...sel.options].some(o => o.value === v)) return;
+                            const opt = document.createElement('option');
+                            opt.value = v;
+                            opt.textContent = v;
+                            sel.appendChild(opt);
+                        });
+                        // 如果当前没有选择值且有选项，选择第一个
+                        if (!cur && arr.length) sel.value = arr[0];
+                    };
+                    
+                    // 填充业务类型（追加到现有选项后）
+                    fill('bulkBusinessType', presets.business_type);
+                    
+                    // 填充部门（追加到现有选项后）
+                    fill('bulkDepartment', presets.department);
+                    
+                    // 填充处理建议（追加到现有选项后）
+                    fill('bulkProcessingAdvice', presets.processing_advice);
+                    
+                    // 填充敏感等级（追加到现有选项后）
+                    fill('bulkSensitivityLevel', presets.sensitivity_level);
+                })
+                .catch(error => {
+                    console.error('加载预设选项失败:', error);
+                });
+        }
+
+        function submitBulkMark() {
+            const checked = Array.from(document.querySelectorAll('.select-scan:checked'));
+            if(checked.length === 0){ 
+                alert('请先勾选要标记的记录'); 
+                return; 
+            }
+            
+            // 获取表单数据
+            const form = document.getElementById('bulkMarkForm');
+            const formData = new FormData(form);
+            
+            // 验证必填字段
+            if (!formData.get('business_type')) {
+                alert('请选择业务类型');
+                return;
+            }
+            
+            // 收集所有选中的扫描ID
+            const scanIds = checked.map(chk => parseInt(chk.value));
+            
+            // 构建请求数据
+            const data = {
+                scan_ids: scanIds,
+                business_type: formData.get('business_type'),
+                department: formData.get('department') || null,
+                owner: formData.get('owner') || null,
+                classification: formData.get('classification') || null,
+                retention_period: formData.get('retention_period') || null,
+                notes: formData.get('notes') || null,
+                processing_advice: formData.get('processing_advice') || null,
+                sensitivity_level: formData.get('sensitivity_level') || null,
+                entry_time: formData.get('entry_time') || null
+            };
+            
+            // 提交批量标记请求
+            fetch('/api/bulk_mark', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    alert(result.message || `成功标记 ${result.count} 个文件`);
+                    // 关闭模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('bulkMarkModal'));
+                    modal.hide();
+                    // 刷新页面
+                    location.reload();
+                } else {
+                    alert('批量标记失败: ' + (result.error || '未知错误'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('批量标记请求失败，请稍后重试');
+            });
+        }
+    </script>
+</body>
+</html>

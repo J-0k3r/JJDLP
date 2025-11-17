@@ -1,0 +1,14 @@
+Flask==2.3.3
+Flask-SQLAlchemy==3.0.5
+Flask-Migrate==4.0.5
+Flask-WTF==1.1.1
+WTForms==3.0.1
+Werkzeug==2.3.7
+Pillow==10.0.1
+PyPDF2==3.0.1
+python-docx==0.8.11
+numpy==1.24.3
+pandas==2.1.1
+requests==2.31.0
+PyYAML==6.0.1
+pdfkit==1.0.0

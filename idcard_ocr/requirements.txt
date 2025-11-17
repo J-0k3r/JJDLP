@@ -1,0 +1,14 @@
+--index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+--trusted-host download.pytorch.org
+--trusted-host pypi.tuna.tsinghua.edu.cn
+
+torch>=2.0.0
+torchvision>=0.15.0
+Pillow==10.0.1
+Flask==2.3.3
+flask-cors>=4.0.0
+numpy==1.24.3
+opencv-python-headless>=4.6.0.66
+requests==2.31.0
+

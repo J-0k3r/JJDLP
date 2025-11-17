@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+
+# Docker files
+Dockerfile
+.dockerignore
+
+# Test files
+testfile/
+test_api.py
+run_example.py
+
+# Data files (if large)
+data/
+*.zip
+
+# Temporary
+*.tmp
+*.bak
+

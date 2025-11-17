@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # idcard_ocr API 服务（图片识别）
+  idcard-ocr:
+    build:
+      context: ./idcard_ocr
+      dockerfile: Dockerfile
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./idcard_ocr/model:/app/model
+      - ./idcard_ocr/pretrained_models:/app/pretrained_models
+    environment:
+      - PORT=8088
+      - HOST=0.0.0.0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # DLP 主服务
+  dlp-system:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+      - ./instance:/app/instance
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=your-secret-key-here
+      - IDCARD_OCR_API_URL=http://idcard-ocr:8088/predict
+      - IDCARD_OCR_API_TIMEOUT=10
+    depends_on:
+      idcard-ocr:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 可选：添加数据库服务
+  # mysql:
+  #   image: mysql:8.0
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: rootpassword
+  #     MYSQL_DATABASE: dlp_system
+  #     MYSQL_USER: dlp_user
+  #     MYSQL_PASSWORD: dlp_password
+  #   volumes:
+  #     - mysql_data:/var/lib/mysql
+  #   ports:
+  #     - "3306:3306"
+  #   restart: unless-stopped
+
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   restart: unless-stopped
+
+# volumes:
+#   mysql_data:

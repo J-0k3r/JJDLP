@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+uploads/*
+!uploads/.gitkeep
+logs/*
+!logs/.gitkeep
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+*.bak
+
+# Documentation (not needed in container)
+*.md
+docs/
+
+# Test files
+test/
+tests/
+*.test.py
+
+# Docker files (don't copy into container)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Lock files
+installed.lock
+
+# idcard_ocr (handled separately in docker-compose)
+idcard_ocr/
+
+# PaddleOCR models (no longer used)
+.paddleocr/
+

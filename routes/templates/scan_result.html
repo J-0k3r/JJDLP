@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扫描结果 - DLP系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .risk-badge {
+            font-size: 0.9rem;
+        }
+        .sensitive-item {
+            border-left: 4px solid #dc3545;
+            background-color: #f8f9fa;
+        }
+        .confidence-bar {
+            height: 8px;
+            border-radius: 4px;
+        }
+        .file-info {
+            background-color: #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        .border-left-primary {
+            border-left: 4px solid #007bff;
+        }
+        .type-stat-card {
+            transition: transform 0.2s;
+        }
+        .type-stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-shield-check"></i> DLP系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('upload_file') }}">
+                            <i class="bi bi-upload"></i> 文件扫描
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('text_scan') }}">
+                            <i class="bi bi-textarea-t"></i> 文本扫描
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('data_masking') }}">
+                            <i class="bi bi-eye-slash"></i> 数据脱敏
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('scan_history') }}">
+                            <i class="bi bi-clock-history"></i> 扫描历史
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('system_config') }}">
+                            <i class="bi bi-gear"></i> 系统配置
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('custom_rules') }}">
+                            <i class="bi bi-code-slash"></i> 自定义规则
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('manual_import') }}">
+                            <i class="bi bi-journal-arrow-up"></i> 手动导入
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <div class="container mt-4">
+        <!-- 文件信息 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="bi bi-file-earmark"></i> 扫描结果
+                        </h4>
+                        <div>
+                            <span class="badge bg-{{ 'danger' if scan_record.risk_level == '极高' else 'warning' if scan_record.risk_level == '高' else 'info' if scan_record.risk_level == '中' else 'secondary' if scan_record.risk_level == '低' else 'success' if scan_record.risk_level == '无' else 'secondary' }} risk-badge">
+                                {{ scan_record.risk_level }}{% if scan_record.risk_level != '无' %} 风险{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="file-info">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>文件名:</strong> {{ scan_record.file_name }}</p>
+                                    <p><strong>文件大小:</strong> {{ "%.2f"|format(scan_record.file_size / 1024 / 1024) }} MB</p>
+                                    <p><strong>文件类型:</strong> {{ scan_record.file_type.upper() }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>扫描时间:</strong> {{ scan_record.scan_time.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                                    <p><strong>扫描状态:</strong> 
+                                        <span class="badge bg-{{ 'success' if scan_record.scan_status == 'completed' else 'danger' }}">
+                                            {{ scan_record.scan_status }}
+                                        </span>
+                                    </p>
+                                    <p><strong>敏感信息数量:</strong> {{ scan_record.sensitive_count }}</p>
+                                    {% if scan_record.sensitive_types %}
+                                    <p><strong>包含类型:</strong>
+                                        {% for t in scan_record.sensitive_types.split(',') %}
+                                            {% if t == 'ID_CARD_IMAGE' %}
+                                                <span class="badge bg-danger me-1">身份证图片</span>
+                                            {% elif t == 'BANK_CARD_IMAGE' %}
+                                                <span class="badge bg-danger me-1">银行卡图片</span>
+                                            {% elif t == 'ID_CARD' %}
+                                                <span class="badge bg-danger me-1">身份证号</span>
+                                            {% elif t == 'BANK_CARD' %}
+                                                <span class="badge bg-danger me-1">银行卡号</span>
+                                            {% elif t == 'MOBILE_PHONE' %}
+                                                <span class="badge bg-danger me-1">手机号</span>
+                                            {% elif t == 'NAME' %}
+                                                <span class="badge bg-danger me-1">姓名</span>
+                                            {% elif t == 'ADDRESS' %}
+                                                <span class="badge bg-danger me-1">地址</span>
+                                            {% elif t == 'EMAIL' %}
+                                                <span class="badge bg-danger me-1">邮箱</span>
+                                            {% elif t == 'IP_ADDRESS' %}
+                                                <span class="badge bg-danger me-1">IP地址</span>
+                                            {% else %}
+                                                <span class="badge bg-danger me-1">{{ t }}</span>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 敏感数据类型统计 -->
+        {% if type_counts %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-pie-chart"></i> 敏感数据类型统计
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for sensitive_type, count in type_counts.items() %}
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="card border-left-primary h-100 type-stat-card">
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-center">
+                                            <div class="flex-grow-1">
+                                                <h6 class="mb-1">
+                                                    {% if sensitive_type == 'ID_CARD_IMAGE' %}
+                                                        <i class="bi bi-person-badge"></i> 身份证图片
+                                                    {% elif sensitive_type == 'BANK_CARD_IMAGE' %}
+                                                        <i class="bi bi-credit-card"></i> 银行卡图片
+                                                    {% elif sensitive_type == 'ID_CARD' %}
+                                                        <i class="bi bi-person-badge"></i> 身份证号
+                                                    {% elif sensitive_type == 'BANK_CARD' %}
+                                                        <i class="bi bi-credit-card"></i> 银行卡号
+                                                    {% elif sensitive_type == 'MOBILE_PHONE' %}
+                                                        <i class="bi bi-telephone"></i> 手机号
+                                                    {% elif sensitive_type == 'NAME' %}
+                                                        <i class="bi bi-person"></i> 姓名
+                                                    {% elif sensitive_type == 'ADDRESS' %}
+                                                        <i class="bi bi-geo-alt"></i> 地址
+                                                    {% elif sensitive_type == 'EMAIL' %}
+                                                        <i class="bi bi-envelope"></i> 邮箱
+                                                    {% elif sensitive_type == 'IP_ADDRESS' %}
+                                                        <i class="bi bi-globe"></i> IP地址
+                                                    {% else %}
+                                                        <i class="bi bi-tag"></i> {{ sensitive_type }}
+                                                    {% endif %}
+                                                </h6>
+                                                <h4 class="mb-0 text-primary">{{ count }}</h4>
+                                                <small class="text-muted">条</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+                        <h5 class="mt-3">未发现敏感信息</h5>
+                        <p class="text-muted">该文件未检测到敏感信息，可以安全使用。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 业务标记信息 -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bi bi-tags"></i> 业务标记信息
+                        </h5>
+                        {% if business_file %}
+                        <span class="badge bg-success">已标记</span>
+                        {% else %}
+                        <span class="badge bg-warning">未标记</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        {% if business_file %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>业务类型:</strong> {{ business_file.business_type or '未设置' }}</p>
+                                <p><strong>部门:</strong> {{ business_file.department or '未设置' }}</p>
+                                <p><strong>负责人:</strong> {{ business_file.owner or '未设置' }}</p>
+                                <p><strong>文件分类:</strong> {{ business_file.classification or '未设置' }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>入库时间:</strong> 
+                                    {% if business_file.entry_time %}
+                                        {{ business_file.entry_time.strftime('%Y-%m-%d %H:%M:%S') }}
+                                    {% else %}
+                                        未设置
+                                    {% endif %}
+                                </p>
+                                <p><strong>保留期限:</strong> 
+                                    {% if business_file.retention_period %}
+                                        {{ business_file.retention_period }} 天
+                                    {% else %}
+                                        未设置
+                                    {% endif %}
+                                </p>
+                                <p><strong>敏感等级:</strong> 
+                                    {% if business_file.sensitivity_level %}
+                                        <span class="badge bg-{{ 'danger' if business_file.sensitivity_level == '极高' else 'warning' if business_file.sensitivity_level == '高' else 'info' if business_file.sensitivity_level == '中' else 'success' }}">
+                                            {{ business_file.sensitivity_level }}
+                                        </span>
+                                    {% else %}
+                                        未设置
+                                    {% endif %}
+                                </p>
+                                <p><strong>处理建议:</strong> {{ business_file.processing_advice or '未设置' }}</p>
+                            </div>
+                        </div>
+                        {% if business_file.notes %}
+                        <div class="row mt-2">
+                            <div class="col-12">
+                                <p><strong>备注:</strong></p>
+                                <div class="alert alert-info">
+                                    {{ business_file.notes }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-exclamation-triangle text-warning" style="font-size: 3rem;"></i>
+                            <h5 class="mt-3">尚未进行业务标记</h5>
+                            <p class="text-muted">请前往业务分类页面填写业务归属、风险等级等信息</p>
+                            <a href="{{ url_for('business_classification', scan_id=scan_record.id) }}" class="btn btn-primary mt-2">
+                                <i class="bi bi-tags"></i> 前往标记
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 风险评估 -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-shield-exclamation"></i> 风险评估
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>风险等级: 
+                                    <span class="badge bg-{{ 'danger' if risk_assessment.risk_level == '极高' else 'warning' if risk_assessment.risk_level == '高' else 'info' if risk_assessment.risk_level == '中' else 'secondary' if risk_assessment.risk_level == '低' else 'success' if risk_assessment.risk_level == '无' else 'secondary' }}">
+                                        {{ risk_assessment.risk_level }}
+                                    </span>
+                                </h6>
+                                <p><strong>风险分数:</strong> {{ "%.2f"|format(risk_assessment.risk_score) }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>处理建议:</h6>
+                                <ul class="list-unstyled">
+                                    {% for recommendation in risk_assessment.recommendations %}
+                                    <li><i class="bi bi-check-circle text-success"></i> {{ recommendation }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('scan_result', scan_id=scan_record.id, export='csv') }}" class="btn btn-success">
+                                <i class="bi bi-download"></i> 导出明细CSV
+                            </a>
+                            <a href="{{ url_for('scan_result', scan_id=scan_record.id, export='pdf') }}" class="btn btn-danger">
+                                <i class="bi bi-file-earmark-pdf"></i> 导出PDF
+                            </a>
+                            <a href="{{ url_for('business_classification', scan_id=scan_record.id) }}" class="btn btn-primary">
+                                <i class="bi bi-tags"></i> 业务分类
+                            </a>
+                            <a href="{{ url_for('data_masking') }}" class="btn btn-warning">
+                                <i class="bi bi-eye-slash"></i> 数据脱敏
+                            </a>
+                            <a href="{{ url_for('scan_history') }}" class="btn btn-secondary">
+                                <i class="bi bi-clock-history"></i> 扫描历史
+                            </a>
+                            <a href="{{ url_for('upload_file') }}" class="btn btn-success">
+                                <i class="bi bi-plus"></i> 继续扫描
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

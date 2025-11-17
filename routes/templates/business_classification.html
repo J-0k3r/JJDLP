@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>业务分类 - DLP系统</title>
+    <link href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+    <style>
+        .classification-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+        }
+        .form-section {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-shield-check"></i> DLP系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('upload_file') }}">
+                            <i class="bi bi-upload"></i> 文件扫描
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('text_scan') }}">
+                            <i class="bi bi-textarea-t"></i> 文本扫描
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('data_masking') }}">
+                            <i class="bi bi-eye-slash"></i> 数据脱敏
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('scan_history') }}">
+                            <i class="bi bi-clock-history"></i> 扫描历史
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('system_config') }}">
+                            <i class="bi bi-gear"></i> 系统配置
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('custom_rules') }}">
+                            <i class="bi bi-code-slash"></i> 自定义规则
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('manual_import') }}">
+                            <i class="bi bi-journal-arrow-up"></i> 手动导入
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8 mx-auto">
+                <!-- 文件信息卡片 -->
+                <div class="card classification-card mb-4">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h4 class="mb-2">
+                                    <i class="bi bi-file-earmark"></i> {{ scan_record.file_name }}
+                                </h4>
+                                <p class="mb-1">
+                                    <i class="bi bi-calendar"></i> 扫描时间: {{ scan_record.scan_time.strftime('%Y-%m-%d %H:%M:%S') }}
+                                </p>
+                                <p class="mb-1">
+                                    <i class="bi bi-hdd"></i> 文件大小: {{ "%.2f"|format(scan_record.file_size / 1024 / 1024) }} MB
+                                </p>
+                                <p class="mb-0">
+                                    <i class="bi bi-exclamation-triangle"></i> 敏感信息: {{ scan_record.sensitive_count }} 个
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <span class="badge bg-{{ 'danger' if scan_record.risk_level == '极高' else 'warning' if scan_record.risk_level == '高' else 'info' if scan_record.risk_level == '中' else 'secondary' if scan_record.risk_level == '低' else 'success' if scan_record.risk_level == '无' else 'secondary' }} fs-6">
+                                    {{ scan_record.risk_level }}{% if scan_record.risk_level != '无' %} 风险{% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 业务分类表单 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="mb-0">
+                            <i class="bi bi-tags"></i> 业务文件分类
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="post">
+                            <div class="form-section">
+                                <h5><i class="bi bi-briefcase"></i> 业务信息</h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">业务类型 *</label>
+                                            <select class="form-select" name="business_type" required>
+                                                <option value="">请选择业务类型</option>
+                                                <option value="财务" {{ 'selected' if business_file and business_file.business_type == '财务' else '' }}>财务</option>
+                                                <option value="人事" {{ 'selected' if business_file and business_file.business_type == '人事' else '' }}>人事</option>
+                                                <option value="客户" {{ 'selected' if business_file and business_file.business_type == '客户' else '' }}>客户</option>
+                                                <option value="合同" {{ 'selected' if business_file and business_file.business_type == '合同' else '' }}>合同</option>
+                                                <option value="技术" {{ 'selected' if business_file and business_file.business_type == '技术' else '' }}>技术</option>
+                                                <option value="运营" {{ 'selected' if business_file and business_file.business_type == '运营' else '' }}>运营</option>
+                                                <option value="法务" {{ 'selected' if business_file and business_file.business_type == '法务' else '' }}>法务</option>
+                                                <option value="其他" {{ 'selected' if business_file and business_file.business_type == '其他' else '' }}>其他</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">所属部门</label>
+                                            <select class="form-select" name="department">
+                                                <option value="">请选择部门</option>
+                                                <option value="财务部" {{ 'selected' if business_file and business_file.department == '财务部' else '' }}>财务部</option>
+                                                <option value="人事部" {{ 'selected' if business_file and business_file.department == '人事部' else '' }}>人事部</option>
+                                                <option value="销售部" {{ 'selected' if business_file and business_file.department == '销售部' else '' }}>销售部</option>
+                                                <option value="技术部" {{ 'selected' if business_file and business_file.department == '技术部' else '' }}>技术部</option>
+                                                <option value="运营部" {{ 'selected' if business_file and business_file.department == '运营部' else '' }}>运营部</option>
+                                                <option value="法务部" {{ 'selected' if business_file and business_file.department == '法务部' else '' }}>法务部</option>
+                                                <option value="行政部" {{ 'selected' if business_file and business_file.department == '行政部' else '' }}>行政部</option>
+                                                <option value="其他" {{ 'selected' if business_file and business_file.department == '其他' else '' }}>其他</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">负责人</label>
+                                            <input type="text" class="form-control" name="owner" 
+                                                   value="{{ business_file.owner if business_file else '' }}" 
+                                                   placeholder="请输入负责人姓名">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">文件分类</label>
+                                            <select class="form-select" name="classification">
+                                                <option value="">请选择文件分类</option>
+                                                <option value="机密" {{ 'selected' if business_file and business_file.classification == '机密' else '' }}>机密</option>
+                                                <option value="内部" {{ 'selected' if business_file and business_file.classification == '内部' else '' }}>内部</option>
+                                                <option value="公开" {{ 'selected' if business_file and business_file.classification == '公开' else '' }}>公开</option>
+                                                <option value="受限" {{ 'selected' if business_file and business_file.classification == '受限' else '' }}>受限</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <h5><i class="bi bi-calendar-check"></i> 管理信息</h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">保留期限 (天)</label>
+                                            <input type="number" class="form-control" name="retention_period" 
+                                                   value="{{ business_file.retention_period if business_file else '' }}" 
+                                                   placeholder="请输入保留期限" min="1" max="3650">
+                                            <div class="form-text">建议保留期限：财务文件(7年)，人事文件(3年)，合同文件(10年)</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">风险等级（手动设置）</label>
+                                            <select class="form-select" name="risk_level">
+                                                <option value="">不更改</option>
+                                                <option value="无" {{ 'selected' if scan_record.risk_level == '无' else '' }}>无</option>
+                                                <option value="低" {{ 'selected' if scan_record.risk_level == '低' else '' }}>低</option>
+                                                <option value="中" {{ 'selected' if scan_record.risk_level == '中' else '' }}>中</option>
+                                                <option value="高" {{ 'selected' if scan_record.risk_level == '高' else '' }}>高</option>
+                                                <option value="极高" {{ 'selected' if scan_record.risk_level == '极高' else '' }}>极高</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">处理建议</label>
+                                            <div class="input-group">
+                                                <select class="form-select" name="processing_advice" id="processingAdvice">
+                                                    <option value="">请选择处理建议</option>
+                                                    <option value="正常存储">正常存储</option>
+                                                    <option value="加密存储">加密存储</option>
+                                                    <option value="定期审查">定期审查</option>
+                                                    <option value="立即处理">立即处理</option>
+                                                    <option value="限制访问">限制访问</option>
+                                                </select>
+                                                <button class="btn btn-outline-secondary" type="button" onclick="addCustomOption('processingAdvice')">自定义</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">敏感等级</label>
+                                            <div class="input-group">
+                                                <select class="form-select" name="sensitivity_level" id="sensitivityLevel">
+                                                    <option value="">请选择敏感等级</option>
+                                                    <option value="低" {{ 'selected' if business_file and business_file.sensitivity_level == '低' else '' }}>低</option>
+                                                    <option value="中" {{ 'selected' if business_file and business_file.sensitivity_level == '中' else '' }}>中</option>
+                                                    <option value="高" {{ 'selected' if business_file and business_file.sensitivity_level == '高' else '' }}>高</option>
+                                                    <option value="极高" {{ 'selected' if business_file and business_file.sensitivity_level == '极高' else '' }}>极高</option>
+                                                </select>
+                                                <button class="btn btn-outline-secondary" type="button" onclick="addCustomOption('sensitivityLevel')">自定义</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">入库时间</label>
+                                            <input type="datetime-local" class="form-control" name="entry_time" 
+                                                   value="{{ business_file.entry_time.strftime('%Y-%m-%dT%H:%M') if business_file and business_file.entry_time else '' }}">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <h5><i class="bi bi-chat-text"></i> 备注信息</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">备注</label>
+                                    <textarea class="form-control" name="notes" rows="4" 
+                                              placeholder="请输入备注信息...">{{ business_file.notes if business_file else '' }}</textarea>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <a href="{{ url_for('scan_result', scan_id=scan_record.id) }}" class="btn btn-secondary">
+                                    <i class="bi bi-arrow-left"></i> 返回扫描结果
+                                </a>
+                                <div>
+                                    <button type="button" class="btn btn-outline-primary me-2" onclick="previewClassification()">
+                                        <i class="bi bi-eye"></i> 预览
+                                    </button>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="bi bi-check"></i> 保存分类
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 分类建议 -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-lightbulb"></i> 智能分类建议
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>基于文件内容的建议：</h6>
+                                <ul class="list-unstyled">
+                                    {% if scan_record.sensitive_count > 0 %}
+                                    <li><i class="bi bi-exclamation-triangle text-warning"></i> 检测到敏感信息，建议分类为"机密"</li>
+                                    {% endif %}
+                                    {% if scan_record.file_type == 'pdf' %}
+                                    <li><i class="bi bi-file-earmark-pdf text-danger"></i> PDF文档，建议设置较长的保留期限</li>
+                                    {% endif %}
+                                    {% if scan_record.file_size > 10 * 1024 * 1024 %}
+                                    <li><i class="bi bi-hdd text-info"></i> 大文件，建议定期审查存储状态</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>基于风险等级的建议：</h6>
+                                <ul class="list-unstyled">
+                                    {% if scan_record.risk_level == '极高' %}
+                                    <li><i class="bi bi-shield-exclamation text-danger"></i> 极高风险，建议立即处理并限制访问</li>
+                                    {% elif scan_record.risk_level == '高' %}
+                                    <li><i class="bi bi-shield-exclamation text-warning"></i> 高风险，建议加密存储并定期审查</li>
+                                    {% elif scan_record.risk_level == '中' %}
+                                    <li><i class="bi bi-shield-check text-info"></i> 中风险，建议正常存储并设置访问控制</li>
+                                    {% elif scan_record.risk_level == '低' %}
+                                    <li><i class="bi bi-shield-check text-secondary"></i> 低风险，建议对敏感数据进行脱敏处理</li>
+                                    {% else %}
+                                    <li><i class="bi bi-shield-check text-success"></i> 无风险，可以正常处理</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script>
+        function previewClassification() {
+            const form = document.querySelector('form');
+            const formData = new FormData(form);
+            
+            let preview = '分类预览：\n';
+            preview += `业务类型: ${formData.get('business_type') || '未选择'}\n`;
+            preview += `所属部门: ${formData.get('department') || '未选择'}\n`;
+            preview += `负责人: ${formData.get('owner') || '未填写'}\n`;
+            preview += `文件分类: ${formData.get('classification') || '未选择'}\n`;
+            preview += `保留期限: ${formData.get('retention_period') || '未设置'} 天\n`;
+            preview += `备注: ${formData.get('notes') || '无'}`;
+            
+            alert(preview);
+        }
+
+        // 根据业务类型自动设置部门
+        document.querySelector('select[name="business_type"]').addEventListener('change', function() {
+            const businessType = this.value;
+            const departmentSelect = document.querySelector('select[name="department"]');
+            
+            // 清空当前选择
+            departmentSelect.value = '';
+            
+            // 根据业务类型设置建议部门
+            const suggestions = {
+                '财务': '财务部',
+                '人事': '人事部',
+                '客户': '销售部',
+                '合同': '法务部',
+                '技术': '技术部',
+                '运营': '运营部',
+                '法务': '法务部'
+            };
+            
+            if (suggestions[businessType]) {
+                departmentSelect.value = suggestions[businessType];
+            }
+        });
+
+        // 根据文件分类设置保留期限建议
+        document.querySelector('select[name="classification"]').addEventListener('change', function() {
+            const classification = this.value;
+            const retentionInput = document.querySelector('input[name="retention_period"]');
+            
+            const suggestions = {
+                '机密': 2555,  // 7年
+                '内部': 1095,  // 3年
+                '公开': 365,   // 1年
+                '受限': 1825   // 5年
+            };
+            
+            if (suggestions[classification]) {
+                retentionInput.value = suggestions[classification];
+            }
+        });
+
+        function addCustomOption(selectId) {
+            const sel = document.getElementById(selectId);
+            const val = prompt('请输入自定义选项：');
+            if (!val) return;
+            // 先本地追加
+            const opt = document.createElement('option');
+            opt.value = val; opt.textContent = val; sel.appendChild(opt); sel.value = val;
+            // 同步到后端预设
+            const fieldMap = { processingAdvice: 'processing_advice', sensitivityLevel: 'sensitivity_level', businessType: 'business_type', department: 'department' };
+            const field = fieldMap[selectId] || (selectId === 'processingAdvice' ? 'processing_advice' : (selectId === 'sensitivityLevel' ? 'sensitivity_level' : ''));
+            if (field) {
+                fetch('/api/presets', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ field, value: val }) });
+            }
+        }
+        // 页面加载时拉取预设，填充相应下拉
+        (function loadPresets(){
+            fetch('/api/presets').then(r=>r.json()).then(d=>{
+                if (!d.success) return;
+                const data = d.data||{};
+                const fill = (id, arr)=>{
+                    const sel = document.querySelector(`#${id}`) || document.querySelector(`[name="${id}"]`);
+                    if (!sel || !Array.isArray(arr)) return;
+                    const cur = sel.value;
+                    arr.forEach(v=>{
+                        if ([...sel.options].some(o=>o.value===v)) return;
+                        const opt=document.createElement('option'); opt.value=v; opt.textContent=v; sel.appendChild(opt);
+                    });
+                    if (!cur && arr.length) sel.value = arr[0];
+                };
+                fill('business_type', data.business_type);
+                fill('department', data.department);
+                fill('processingAdvice', data.processing_advice);
+                fill('sensitivityLevel', data.sensitivity_level);
+            }).catch(()=>{});
+        })();
+    </script>
+</body>
+</html>
